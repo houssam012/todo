@@ -1,0 +1,174 @@
+#!/bin/bash
+
+TSK_FILE="tasks.txt"
+
+ld_tsk() {
+  if [ ! -f "$TSK_FILE" ]; then
+    touch "$TSK_FILE"
+  fi
+  cat "$TSK_FILE"
+}
+
+sv_tsk() {
+  echo "$1" > "$TSK_FILE"
+}
+
+gen_id() {
+  if [ ! -f "$TSK_FILE" ]; then
+    echo 1
+  else
+    awk -F '|' '{print $1}' "$TSK_FILE" | sort -n | tail -1 | awk '{print $1+1}'
+  fi
+}
+
+crt_tsk() {
+  id=$(gen_id)
+  echo -n "Enter title: "
+  read ttl
+  if [ -z "$ttl" ]; then
+    echo "Title is required." >&2
+    return
+  fi
+
+  echo -n "Enter due date (YYYY-MM-DD): "
+  read due_dt
+  if ! date -d "$due_dt" &>/dev/null; then
+    echo "Invalid date format." >&2
+    return
+  fi
+
+  echo -n "Enter description (optional): "
+  read desc
+  echo -n "Enter location (optional): "
+  read loc
+  echo -n "Enter due time (HH:MM, optional): "
+  read due_tm
+  comp="no"
+
+  tsk="$id|$ttl|$desc|$loc|$due_dt $due_tm|$comp"
+  tsks=$(ld_tsk)
+  tsks="$tsks"$'\n'"$tsk"
+  sv_tsk "$tsks"
+}
+
+upd_tsk() {
+  echo -n "Enter task ID to update: "
+  read id
+  tsks=$(ld_tsk)
+  if ! echo "$tsks" | grep -q "^$id|"; then
+    echo "Task not found." >&2
+    return
+  fi
+
+  new_tsks=$(echo "$tsks" | grep -v "^$id|")
+  echo -n "Enter new title (leave empty to keep current): "
+  read ttl
+  echo -n "Enter new due date (YYYY-MM-DD, leave empty to keep current): "
+  read due_dt
+  if [ -n "$due_dt" ] && ! date -d "$due_dt" &>/dev/null; then
+    echo "Invalid date format." >&2
+    return
+  fi
+  echo -n "Enter new description (leave empty to keep current): "
+  read desc
+  echo -n "Enter new location (leave empty to keep current): "
+  read loc
+  echo -n "Enter new due time (HH:MM, leave empty to keep current): "
+  read due_tm
+  echo -n "Enter new completion status (yes/no, leave empty to keep current): "
+  read comp
+
+  old_tsk=$(echo "$tsks" | grep "^$id|")
+  old_ttl=$(echo "$old_tsk" | cut -d '|' -f 2)
+  old_due_dt=$(echo "$old_tsk" | cut -d '|' -f 5)
+  old_desc=$(echo "$old_tsk" | cut -d '|' -f 3)
+  old_loc=$(echo "$old_tsk" | cut -d '|' -f 4)
+  old_comp=$(echo "$old_tsk" | cut -d '|' -f 6)
+
+  ttl=${ttl:-$old_ttl}
+  due_dt=${due_dt:-$old_due_dt}
+  desc=${desc:-$old_desc}
+  loc=${loc:-$old_loc}
+  comp=${comp:-$old_comp}
+
+  new_tsk="$id|$ttl|$desc|$loc|$due_dt $due_tm|$comp"
+  new_tsks="$new_tsks"$'\n'"$new_tsk"
+  sv_tsk "$new_tsks"
+}
+
+del_tsk() {
+  echo -n "Enter task ID to delete: "
+  read id
+  tsks=$(ld_tsk)
+  if ! echo "$tsks" | grep -q "^$id|"; then
+    echo "Task not found." >&2
+    return
+  fi
+  new_tsks=$(echo "$tsks" | grep -v "^$id|")
+  sv_tsk "$new_tsks"
+}
+
+shw_tsk() {
+  echo -n "Enter task ID to view: "
+  read id
+  tsk=$(ld_tsk | grep "^$id|")
+  if [ -z "$tsk" ]; then
+    echo "Task not found." >&2
+    return
+  fi
+  echo "$tsk"
+}
+
+lst_tsks() {
+  echo -n "Enter date (YYYY-MM-DD) to list tasks: "
+  read dt
+  if ! date -d "$dt" &>/dev/null; then
+    echo "Invalid date format." >&2
+    return
+  fi
+  tsks=$(ld_tsk | grep "$dt")
+  echo "Completed tasks:"
+  echo "$tsks" | grep "|yes$"
+  echo "Uncompleted tasks:"
+  echo "$tsks" | grep "|no$"
+}
+
+srch_tsk() {
+  echo -n "Enter title to search: "
+  read ttl
+  tsks=$(ld_tsk | grep "|$ttl|")
+  if [ -z "$tsks" ]; then
+    echo "No tasks found with the title '$ttl'." >&2
+    return
+  fi
+  echo "$tsks"
+}
+
+if [ $# -eq 0 ]; then
+  today=$(date +%Y-%m-%d)
+  tsks=$(ld_tsk | grep "$today")
+  echo "Completed tasks:"
+  echo "$tsks" | grep "|yes$"
+  echo "Uncompleted tasks:"
+  echo "$tsks" | grep "|no$"
+  exit 0
+fi
+
+echo "1. Create a task"
+echo "2. Update a task"
+echo "3. Delete a task"
+echo "4. Show task details"
+echo "5. List tasks of a given day"
+echo "6. Search for a task by title"
+echo -n "Choose an option: "
+read opt
+
+case $opt in
+  1) crt_tsk ;;
+  2) upd_tsk ;;
+  3) del_tsk ;;
+  4) shw_tsk ;;
+  5) lst_tsks ;;
+  6) srch_tsk ;;
+  *) echo "Invalid option." >&2 ;;
+esac
