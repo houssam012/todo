@@ -34,3 +34,4 @@ Tasks are saved in a file that is called tasks and is structured as a plain text
 3)runing this program
 
 chmod +x todo. sh
+./todo.sh
